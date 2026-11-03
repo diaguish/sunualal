@@ -22,7 +22,7 @@ export interface TenantEntry {
   /** Jours restants avant la fin du bail ; négatif si le bail est terminé. */
   daysLeft: number;
   endingSoon: boolean;
-  /** Comment les derniers loyers ont été payés, du plus ancien au plus récent. */
+  /** Comment les derniers loyers ont été payés, du plus ancien au plus récent ; vide pour un nouveau locataire. */
   regularity: MonthRegularity[];
 }
 
@@ -46,10 +46,10 @@ export function buildTenantEntries(
         unpaid: status === 'en_retard',
         daysLeft,
         endingSoon: daysLeft <= LEASE_ENDING_SOON_DAYS,
-        regularity: previousPeriods(period, REGULARITY_MONTHS).map((month) => ({
-          period: month,
-          punctuality: rentPunctuality(lease, month, payments),
-        })),
+        regularity: previousPeriods(period, REGULARITY_MONTHS).flatMap((month) => {
+          const punctuality = rentPunctuality(lease, month, payments);
+          return punctuality === 'hors_bail' ? [] : [{ period: month, punctuality }];
+        }),
       },
     ];
   });

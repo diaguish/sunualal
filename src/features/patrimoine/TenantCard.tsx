@@ -68,7 +68,7 @@ export function TenantCard({ entry, period }: { entry: TenantEntry; period: stri
         <StatusBadge status={view.status} label={view.status === 'paye' ? 'À jour' : undefined} />
       </View>
 
-      <RegularityDots months={entry.regularity} />
+      {entry.regularity.length > 0 && <RegularityDots months={entry.regularity} />}
     </Card>
   );
 }

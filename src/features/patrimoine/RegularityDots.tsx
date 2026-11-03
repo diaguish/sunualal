@@ -4,16 +4,16 @@ import type { RentPunctuality } from '@/domain/rent';
 import { colors, spacing, typography } from '@/theme';
 import { formatDate, formatPeriod } from '@/utils/format';
 
+/** Un mois où le loyer était dû : les mois d'avant l'arrivée du locataire ne sont pas affichés. */
 export interface MonthRegularity {
   period: string;
-  punctuality: RentPunctuality;
+  punctuality: Exclude<RentPunctuality, 'hors_bail'>;
 }
 
-const PUNCTUALITY: Record<RentPunctuality, { color: string; label: string }> = {
+const PUNCTUALITY: Record<MonthRegularity['punctuality'], { color: string; label: string }> = {
   a_temps: { color: colors.paid, label: 'payé à temps' },
   en_retard: { color: colors.toVerify, label: 'payé en retard' },
   impaye: { color: colors.late, label: 'impayé' },
-  hors_bail: { color: colors.toPay, label: 'pas encore dans le bien' },
 };
 
 /** « 2026-05 » → « mai ». */
@@ -21,10 +21,11 @@ const shortMonth = (period: string) => formatDate(`${period}-01`).split(' ')[1];
 
 /** Un point par mois : vert si payé à temps, orange si payé en retard, rouge si impayé. */
 export function RegularityDots({ months }: { months: MonthRegularity[] }) {
-  const hasGrey = months.some((m) => m.punctuality === 'hors_bail');
   return (
     <View style={styles.root}>
-      <Text style={[typography.overline, styles.muted]}>Régularité sur les {months.length} derniers mois</Text>
+      <Text style={[typography.overline, styles.muted]}>
+        {months.length > 1 ? `Régularité sur les ${months.length} derniers mois` : 'Régularité sur le dernier mois'}
+      </Text>
       <View style={styles.row}>
         {months.map(({ period, punctuality }) => (
           <View
@@ -39,7 +40,6 @@ export function RegularityDots({ months }: { months: MonthRegularity[] }) {
       </View>
       <Text style={[typography.caption, styles.muted]}>
         Vert : payé à temps · Orange : payé en retard · Rouge : impayé
-        {hasGrey && ' · Gris : pas encore dans le bien'}
       </Text>
     </View>
   );
