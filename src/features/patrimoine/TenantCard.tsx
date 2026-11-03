@@ -5,6 +5,7 @@ import { Avatar, Button, Card, StatusBadge } from '@/components/ui';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatDate, formatFCFA, formatPeriod } from '@/utils/format';
 
+import { RegularityDots } from './RegularityDots';
 import { situationText } from './RentSituation';
 import type { TenantEntry } from './tenants';
 
@@ -66,6 +67,8 @@ export function TenantCard({ entry, period }: { entry: TenantEntry; period: stri
         </View>
         <StatusBadge status={view.status} label={view.status === 'paye' ? 'À jour' : undefined} />
       </View>
+
+      <RegularityDots months={entry.regularity} />
     </Card>
   );
 }

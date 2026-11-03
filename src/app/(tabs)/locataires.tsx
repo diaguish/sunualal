@@ -37,7 +37,7 @@ export default function LocatairesScreen() {
     const freeUnits = views
       .filter((view) => view.status === 'libre')
       .map((view) => ({ view, propertyName: properties.find((p) => p.id === view.unit.propertyId)?.name ?? '' }));
-    return { today, period, freeUnits, entries: buildTenantEntries(views, properties, today) };
+    return { today, period, freeUnits, entries: buildTenantEntries(views, properties, payments, period, today) };
   }, []);
   useReloadOnFocus(reload);
 

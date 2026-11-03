@@ -1,9 +1,14 @@
-import type { Lease, Property, Tenant } from '@/types/models';
+import { previousPeriods, rentPunctuality } from '@/domain/rent';
+import type { Lease, Payment, Property, Tenant } from '@/types/models';
 
+import type { MonthRegularity } from './RegularityDots';
 import type { UnitView } from './units';
 
 /** En dessous de ce nombre de jours, un bail est signalé « fin de bail proche ». */
 const LEASE_ENDING_SOON_DAYS = 90;
+
+/** Nombre de mois passés affichés dans les points de régularité. */
+const REGULARITY_MONTHS = 5;
 
 /** Une ligne de la liste : un locataire avec le lot qu'il occupe. */
 export interface TenantEntry {
@@ -17,9 +22,17 @@ export interface TenantEntry {
   /** Jours restants avant la fin du bail ; négatif si le bail est terminé. */
   daysLeft: number;
   endingSoon: boolean;
+  /** Comment les derniers loyers ont été payés, du plus ancien au plus récent. */
+  regularity: MonthRegularity[];
 }
 
-export function buildTenantEntries(views: UnitView[], properties: Property[], today: string): TenantEntry[] {
+export function buildTenantEntries(
+  views: UnitView[],
+  properties: Property[],
+  payments: Payment[],
+  period: string,
+  today: string,
+): TenantEntry[] {
   return views.flatMap((view) => {
     const { unit, lease, tenant, status } = view;
     if (!lease || !tenant) return [];
@@ -33,6 +46,10 @@ export function buildTenantEntries(views: UnitView[], properties: Property[], to
         unpaid: status === 'en_retard',
         daysLeft,
         endingSoon: daysLeft <= LEASE_ENDING_SOON_DAYS,
+        regularity: previousPeriods(period, REGULARITY_MONTHS).map((month) => ({
+          period: month,
+          punctuality: rentPunctuality(lease, month, payments),
+        })),
       },
     ];
   });
