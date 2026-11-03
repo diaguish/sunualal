@@ -1,16 +1,17 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppHeader, Button, Card, Screen } from '@/components/ui';
 import * as api from '@/data/api';
 import { paidAmount } from '@/domain/rent';
+import { FilterChip } from '@/features/patrimoine/FilterChip';
 import { PropertyStats } from '@/features/patrimoine/PropertyStats';
 import { UnitGrid } from '@/features/patrimoine/UnitGrid';
 import { UnitSheet } from '@/features/patrimoine/UnitSheet';
 import { buildUnitViews, UnitView } from '@/features/patrimoine/units';
 import { useData } from '@/hooks/use-data';
-import { colors, radius, spacing, typography } from '@/theme';
+import { colors, spacing, typography } from '@/theme';
 
 /**
  * Immeubles — un bien à la fois, choisi dans les pastilles du haut.
@@ -49,19 +50,9 @@ export default function ImmeublesScreen() {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        {data?.properties.map((p) => {
-          const active = p.id === property?.id;
-          return (
-            <Pressable
-              key={p.id}
-              onPress={() => setSelectedId(p.id)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              style={[styles.chip, active && styles.chipActive]}>
-              <Text style={[typography.caption, styles.chipText, active && styles.chipTextActive]}>{p.name}</Text>
-            </Pressable>
-          );
-        })}
+        {data?.properties.map((p) => (
+          <FilterChip key={p.id} label={p.name} active={p.id === property?.id} onPress={() => setSelectedId(p.id)} />
+        ))}
       </ScrollView>
 
       {property && data && (
@@ -90,13 +81,4 @@ const styles = StyleSheet.create({
   text: { color: colors.text },
   muted: { color: colors.textMuted },
   chips: { gap: spacing.sm },
-  chip: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  chipActive: { backgroundColor: colors.primary },
-  chipText: { color: colors.text, fontWeight: '600' },
-  chipTextActive: { color: colors.textOnPrimary },
 });
