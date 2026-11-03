@@ -39,6 +39,18 @@ export async function createProperty(input: Omit<Property, 'id'>, unitLabels: st
   return delay(property);
 }
 
+export async function createTenant(input: Omit<Tenant, 'id'>): Promise<Tenant> {
+  const tenant: Tenant = { ...input, id: newId('t') };
+  db.tenants.push(tenant);
+  return delay(tenant);
+}
+
+export async function createLease(input: Omit<Lease, 'id'>): Promise<Lease> {
+  const lease: Lease = { ...input, id: newId('l') };
+  db.leases.push(lease);
+  return delay(lease);
+}
+
 // ——— Argent : paiements, quittances, dépenses ———
 
 export const listPayments = (period?: string): Promise<Payment[]> =>
