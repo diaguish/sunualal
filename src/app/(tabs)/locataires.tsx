@@ -1,13 +1,15 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollView, ScrollViewInstance, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppHeader, Button, Card, Screen } from '@/components/ui';
 import * as api from '@/data/api';
+import { AddTenantForm } from '@/features/patrimoine/AddTenantForm';
 import { FilterChip } from '@/features/patrimoine/FilterChip';
 import { TenantCard } from '@/features/patrimoine/TenantCard';
 import { TenantRow } from '@/features/patrimoine/TenantRow';
 import { buildTenantEntries, matchesSearch, TenantEntry } from '@/features/patrimoine/tenants';
 import { buildUnitViews } from '@/features/patrimoine/units';
+import { useReloadOnFocus } from '@/features/patrimoine/use-reload-on-focus';
 import { useData } from '@/hooks/use-data';
 import { colors, radius, spacing, typography } from '@/theme';
 
@@ -21,7 +23,7 @@ const FILTERS: { key: Filter; label: string; matches: (entry: TenantEntry) => bo
 
 /** Locataires — recherche, filtres et fiche du locataire sélectionné. Maquette : « Locataires ». */
 export default function LocatairesScreen() {
-  const { data } = useData(async () => {
+  const { data, reload } = useData(async () => {
     const [today, period, properties, units, leases, tenants, payments] = await Promise.all([
       api.getToday(),
       api.getCurrentPeriod(),
@@ -32,15 +34,21 @@ export default function LocatairesScreen() {
       api.listPayments(),
     ]);
     const views = buildUnitViews(units, leases, tenants, payments, period, today);
-    return { period, entries: buildTenantEntries(views, properties, today) };
+    const freeUnits = views
+      .filter((view) => view.status === 'libre')
+      .map((view) => ({ view, propertyName: properties.find((p) => p.id === view.unit.propertyId)?.name ?? '' }));
+    return { today, period, freeUnits, entries: buildTenantEntries(views, properties, today) };
   }, []);
+  useReloadOnFocus(reload);
 
   const [filter, setFilter] = useState<Filter>('tous');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string>();
+  const [adding, setAdding] = useState(false);
 
   const scrollRef = useRef<ScrollViewInstance>(null);
   const cardY = useRef(0);
+  const justAddedId = useRef<string>(undefined);
 
   const activeFilter = FILTERS.find((f) => f.key === filter) ?? FILTERS[0];
   const visible = data?.entries.filter((e) => activeFilter.matches(e) && matchesSearch(e, query.trim()));
@@ -53,6 +61,30 @@ export default function LocatairesScreen() {
     scrollRef.current?.scrollTo({ y: cardY.current, animated: true });
   };
 
+  const addTenant = async (
+    tenantInput: Parameters<typeof api.createTenant>[0],
+    leaseInput: Omit<Parameters<typeof api.createLease>[0], 'tenantId'>,
+  ) => {
+    const tenant = await api.createTenant(tenantInput);
+    const lease = await api.createLease({ ...leaseInput, tenantId: tenant.id });
+    // Filtres retirés pour être sûr de voir le nouveau locataire, dont la fiche s'affiche une fois la liste rechargée.
+    setFilter('tous');
+    setQuery('');
+    setSelectedId(lease.id);
+    justAddedId.current = lease.id;
+    setAdding(false);
+    reload();
+  };
+
+  const selectedLeaseId = selected?.lease.id;
+  useEffect(() => {
+    if (!selectedLeaseId || selectedLeaseId !== justAddedId.current) return;
+    justAddedId.current = undefined;
+    // On laisse d'abord le formulaire finir de se fermer et la fiche prendre sa place sous la liste.
+    const timer = setTimeout(() => scrollRef.current?.scrollTo({ y: cardY.current, animated: true }), 350);
+    return () => clearTimeout(timer);
+  }, [selectedLeaseId]);
+
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -63,8 +95,7 @@ export default function LocatairesScreen() {
           <Text style={[typography.caption, styles.muted]}>Contacts, baux et situation de chacun</Text>
         </View>
 
-        {/* Pas encore de formulaire : il faut d'abord ajouter la création de locataire dans `@/data/api` (zone commune). */}
-        <Button label="Ajouter un locataire" icon="add" disabled />
+        <Button label="Ajouter un locataire" icon="add" onPress={() => setAdding(true)} />
 
         <TextInput
           value={query}
@@ -107,6 +138,16 @@ export default function LocatairesScreen() {
           </View>
         )}
       </ScrollView>
+
+      {data && (
+        <AddTenantForm
+          visible={adding}
+          today={data.today}
+          freeUnits={data.freeUnits}
+          onClose={() => setAdding(false)}
+          onSubmit={addTenant}
+        />
+      )}
     </Screen>
   );
 }

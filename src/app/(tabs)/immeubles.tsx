@@ -10,6 +10,7 @@ import { PropertyStats } from '@/features/patrimoine/PropertyStats';
 import { UnitGrid } from '@/features/patrimoine/UnitGrid';
 import { UnitSheet } from '@/features/patrimoine/UnitSheet';
 import { buildUnitViews, UnitView } from '@/features/patrimoine/units';
+import { useReloadOnFocus } from '@/features/patrimoine/use-reload-on-focus';
 import { useData } from '@/hooks/use-data';
 import { colors, spacing, typography } from '@/theme';
 
@@ -18,7 +19,7 @@ import { colors, spacing, typography } from '@/theme';
  * Maquettes : « Immeubles — résidence Teranga », « lot en retard », « lot libre ».
  */
 export default function ImmeublesScreen() {
-  const { data } = useData(async () => {
+  const { data, reload } = useData(async () => {
     const [today, period, properties, units, leases, tenants, payments] = await Promise.all([
       api.getToday(),
       api.getCurrentPeriod(),
@@ -30,6 +31,7 @@ export default function ImmeublesScreen() {
     ]);
     return { period, properties, views: buildUnitViews(units, leases, tenants, payments, period, today), payments };
   }, []);
+  useReloadOnFocus(reload);
 
   const [selectedId, setSelectedId] = useState<string>();
   const [openUnit, setOpenUnit] = useState<UnitView>();

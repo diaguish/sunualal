@@ -18,6 +18,7 @@ export function situationText({ status, remaining, late, lease, unit }: UnitView
     case 'en_retard':
       return `Doit ${formatFCFA(remaining)} · en retard de ${late} jour${late > 1 ? 's' : ''}`;
     case 'a_payer':
+      if (lease && lease.startDate > dueDate(lease, period)) return 'Premier loyer à venir';
       return `Doit ${formatFCFA(remaining)} · échéance le ${lease ? formatDate(dueDate(lease, period)) : '—'}`;
   }
 }

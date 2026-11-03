@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, Card, SectionHeader } from '@/components/ui';
 import * as api from '@/data/api';
 import { paidAmount } from '@/domain/rent';
+import { useReloadOnFocus } from '@/features/patrimoine/use-reload-on-focus';
 import { useData } from '@/hooks/use-data';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatAmount, formatPeriod } from '@/utils/format';
@@ -17,12 +18,13 @@ import { formatAmount, formatPeriod } from '@/utils/format';
  * Maquette : « Accueil — tableau de bord » et « Accueil — activité et échéances ».
  */
 export default function AccueilScreen() {
-  const { data } = useData(async () => {
+  const { data, reload } = useData(async () => {
     const [period, leases, payments] = await Promise.all([api.getCurrentPeriod(), api.listLeases(), api.listPayments()]);
     const expected = leases.reduce((sum, l) => sum + l.rent, 0);
     const received = leases.reduce((sum, l) => sum + paidAmount(l.id, period, payments), 0);
     return { period, expected, received };
   }, []);
+  useReloadOnFocus(reload);
 
   const progress = data && data.expected > 0 ? data.received / data.expected : 0;
 
