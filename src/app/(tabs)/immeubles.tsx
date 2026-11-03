@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -33,10 +33,11 @@ export default function ImmeublesScreen() {
   }, []);
   useReloadOnFocus(reload);
 
-  const [selectedId, setSelectedId] = useState<string>();
+  // Le bien affiché est dans l'adresse : Accueil et les pastilles passent par le même chemin.
+  const { bien } = useLocalSearchParams<{ bien?: string }>();
   const [openUnit, setOpenUnit] = useState<UnitView>();
 
-  const property = data?.properties.find((p) => p.id === selectedId) ?? data?.properties[0];
+  const property = data?.properties.find((p) => p.id === bien) ?? data?.properties[0];
   const views = data && property ? data.views.filter((v) => v.unit.propertyId === property.id) : [];
   const leases = views.flatMap((v) => (v.lease ? [v.lease] : []));
   const expected = leases.reduce((sum, l) => sum + l.rent, 0);
@@ -53,7 +54,7 @@ export default function ImmeublesScreen() {
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {data?.properties.map((p) => (
-          <FilterChip key={p.id} label={p.name} active={p.id === property?.id} onPress={() => setSelectedId(p.id)} />
+          <FilterChip key={p.id} label={p.name} active={p.id === property?.id} onPress={() => router.setParams({ bien: p.id })} />
         ))}
       </ScrollView>
 
