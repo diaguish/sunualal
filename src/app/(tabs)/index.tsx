@@ -4,9 +4,14 @@ import { ComponentProps } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppHeader, Card, SectionHeader } from '@/components/ui';
+import { AppHeader, Button, Card, SectionHeader } from '@/components/ui';
 import * as api from '@/data/api';
 import { paidAmount } from '@/domain/rent';
+import { buildActivity, buildDeadlines, buildPropertySummaries } from '@/features/patrimoine/dashboard';
+import { ActivityRow, DeadlineRow } from '@/features/patrimoine/DashboardRows';
+import { PropertyCard } from '@/features/patrimoine/PropertyCard';
+import { buildTenantEntries } from '@/features/patrimoine/tenants';
+import { buildUnitViews } from '@/features/patrimoine/units';
 import { useReloadOnFocus } from '@/features/patrimoine/use-reload-on-focus';
 import { useData } from '@/hooks/use-data';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -19,10 +24,29 @@ import { formatAmount, formatPeriod } from '@/utils/format';
  */
 export default function AccueilScreen() {
   const { data, reload } = useData(async () => {
-    const [period, leases, payments] = await Promise.all([api.getCurrentPeriod(), api.listLeases(), api.listPayments()]);
+    const [today, period, properties, units, leases, tenants, payments] = await Promise.all([
+      api.getToday(),
+      api.getCurrentPeriod(),
+      api.listProperties(),
+      api.listUnits(),
+      api.listLeases(),
+      api.listTenants(),
+      api.listPayments(),
+    ]);
     const expected = leases.reduce((sum, l) => sum + l.rent, 0);
     const received = leases.reduce((sum, l) => sum + paidAmount(l.id, period, payments), 0);
-    return { period, expected, received };
+    const views = buildUnitViews(units, leases, tenants, payments, period, today);
+    const entries = buildTenantEntries(views, properties, payments, period, today);
+    return {
+      period,
+      expected,
+      received,
+      lateCount: views.filter((v) => v.status === 'en_retard').length,
+      toVerifyCount: views.filter((v) => v.status === 'a_verifier').length,
+      summaries: buildPropertySummaries(properties, views),
+      activity: buildActivity(payments, entries, period),
+      deadlines: buildDeadlines(entries, period, today),
+    };
   }, []);
   useReloadOnFocus(reload);
 
@@ -58,25 +82,54 @@ export default function AccueilScreen() {
         <View style={styles.body}>
           <View style={styles.actions}>
             <QuickAction label="Encaisser" icon="add" href="/paiement/nouveau" highlighted />
-            <QuickAction label="Relancer" icon="arrow-redo-outline" href="/espace/relances" />
-            <QuickAction label="Vérifier" icon="checkmark" href="/argent" />
+            <QuickAction label="Relancer" icon="arrow-redo-outline" href="/espace/relances" count={data?.lateCount} />
+            <QuickAction label="Vérifier" icon="checkmark" href="/argent" count={data?.toVerifyCount} />
             <QuickAction label="Dépense" icon="cash-outline" href="/espace/travaux" />
           </View>
 
           <SectionHeader title="Mes immeubles" actionLabel="Tout voir" onAction={() => router.push('/immeubles')} />
-          <Card>
-            <Text style={[typography.caption, styles.muted]}>À implémenter · Patrimoine — cartes des immeubles</Text>
-          </Card>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.cardsScroll}
+            contentContainerStyle={styles.cards}>
+            {data?.summaries.map((summary) => (
+              <PropertyCard key={summary.property.id} summary={summary} />
+            ))}
+          </ScrollView>
 
           <SectionHeader title="Activité" actionLabel="Tout voir" onAction={() => router.push('/argent')} />
           <Card>
-            <Text style={[typography.caption, styles.muted]}>À implémenter · Patrimoine — derniers paiements</Text>
+            {data?.activity.map((item) => <ActivityRow key={item.id} item={item} />)}
+            {data?.activity.length === 0 && (
+              <Text style={[typography.body, styles.muted]}>Aucun paiement ce mois-ci.</Text>
+            )}
           </Card>
 
           <SectionHeader title="Prochaines échéances" />
           <Card>
-            <Text style={[typography.caption, styles.muted]}>À implémenter · Patrimoine — loyers et fins de bail</Text>
+            {data?.deadlines.map((item) => <DeadlineRow key={item.id} item={item} />)}
+            {data?.deadlines.length === 0 && (
+              <Text style={[typography.body, styles.muted]}>Aucune échéance à venir.</Text>
+            )}
           </Card>
+
+          <View style={styles.footer}>
+            <Button
+              label="Ajouter un bien"
+              icon="add"
+              variant="accent"
+              style={styles.footerButton}
+              onPress={() => router.push('/ajouter-bien')}
+            />
+            <Button
+              label="Locataires"
+              icon="people-outline"
+              variant="secondary"
+              style={styles.footerButton}
+              onPress={() => router.push('/locataires')}
+            />
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -88,16 +141,24 @@ function QuickAction({
   icon,
   href,
   highlighted,
+  count = 0,
 }: {
   label: string;
   icon: ComponentProps<typeof Ionicons>['name'];
   href: Href;
   highlighted?: boolean;
+  /** Nombre de choses à traiter, affiché en pastille rouge. */
+  count?: number;
 }) {
   return (
     <Pressable style={styles.action} onPress={() => router.push(href)}>
       <View style={[styles.actionIcon, highlighted && { backgroundColor: colors.accent }]}>
         <Ionicons name={icon} size={20} color={colors.primary} />
+        {count > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{count}</Text>
+          </View>
+        )}
       </View>
       <Text style={[typography.caption, styles.actionLabel]}>{label}</Text>
     </Pressable>
@@ -132,5 +193,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actionLabel: { color: colors.text, fontWeight: '500' },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.badge,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: { color: colors.textOnPrimary, fontSize: 11, fontWeight: '700' },
+  // Les cartes défilent jusqu'au bord de l'écran, au-delà de la marge de la page.
+  cardsScroll: { marginHorizontal: -spacing.lg },
+  cards: { paddingHorizontal: spacing.lg, gap: spacing.md },
+  footer: { flexDirection: 'row', gap: spacing.md },
+  footerButton: { flex: 1, alignSelf: 'auto' },
   muted: { color: colors.textMuted },
 });
