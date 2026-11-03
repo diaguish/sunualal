@@ -90,6 +90,34 @@ export const receipts: Receipt[] = payments
     issuedAt: p.paidAt,
   }));
 
+/** Mois précédents : payés à temps sauf les exceptions ci-dessous (points de régularité de la fiche locataire). */
+const HISTORY_PERIODS = ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09'];
+const HISTORY_EXCEPTIONS: Record<string, Record<string, 'en_retard' | 'impaye'>> = {
+  'l-b1': { '2026-08': 'en_retard', '2026-09': 'impaye' },
+  'l-b2': { '2026-07': 'en_retard' },
+  'l-rdc2': { '2026-05': 'en_retard' },
+  'l-1a': { '2026-06': 'impaye', '2026-09': 'en_retard' },
+  'l-2a': { '2026-08': 'en_retard' },
+};
+
+// Ajouté après `receipts` : les quittances fictives restent celles d'octobre.
+leases.forEach((lease) => {
+  HISTORY_PERIODS.forEach((period) => {
+    const exception = HISTORY_EXCEPTIONS[lease.id]?.[period];
+    if (exception === 'impaye') return;
+    const day = lease.dueDay + (exception === 'en_retard' ? 3 : -1);
+    payments.push({
+      id: `pay-${lease.id}-${period}`,
+      leaseId: lease.id,
+      period,
+      amount: lease.rent,
+      method: 'wave',
+      status: 'confirme',
+      paidAt: `${period}-${String(day).padStart(2, '0')}`,
+    });
+  });
+});
+
 export const expenses: Expense[] = [
   { id: 'e-1', propertyId: 'p-teranga', unitId: 'u-c2', label: 'Peinture C2', category: 'travaux', amount: 180_000, date: '2026-10-02' },
   { id: 'e-2', propertyId: 'p-baobab', label: 'Vidange fosse septique', category: 'entretien', amount: 45_000, date: '2026-09-21' },

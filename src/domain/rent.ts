@@ -55,3 +55,29 @@ export function daysLate(lease: Lease, period: string, today: string): number {
   const ms = Date.parse(today) - Date.parse(dueDate(lease, period));
   return Math.max(0, Math.floor(ms / 86_400_000));
 }
+
+/** Comment un loyer passé a été payé. `hors_bail` : le bail a commencé après l'échéance de ce mois. */
+export type RentPunctuality = 'a_temps' | 'en_retard' | 'impaye' | 'hors_bail';
+
+/** Regarde à quelle date le loyer du mois a été entièrement réglé (règlements confirmés seulement). */
+export function rentPunctuality(lease: Lease, period: string, payments: Payment[]): RentPunctuality {
+  const due = dueDate(lease, period);
+  if (lease.startDate > due) return 'hors_bail';
+  const confirmed = payments
+    .filter((p) => p.leaseId === lease.id && p.period === period && p.status === 'confirme')
+    .sort((a, b) => a.paidAt.localeCompare(b.paidAt));
+  let total = 0;
+  for (const payment of confirmed) {
+    total += payment.amount;
+    if (total >= lease.rent) return payment.paidAt > due ? 'en_retard' : 'a_temps';
+  }
+  return 'impaye';
+}
+
+/** Les `count` mois précédant `period`, du plus ancien au plus récent : ("2026-10", 2) → ["2026-08", "2026-09"]. */
+export function previousPeriods(period: string, count: number): string[] {
+  const [year, month] = period.split('-').map(Number);
+  return Array.from({ length: count }, (_, i) =>
+    new Date(Date.UTC(year, month - 1 - count + i, 1)).toISOString().slice(0, 7),
+  );
+}
