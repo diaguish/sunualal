@@ -87,6 +87,20 @@ export interface Expense {
   date: string;
 }
 
+export type InterventionStatus = 'en_cours' | 'termine';
+
+/** Un problème à régler sur un bien : fuite, panne, réparation… */
+export interface Intervention {
+  id: ID;
+  propertyId: ID;
+  unitId?: ID;
+  label: string;
+  reportedByTenantId?: ID; // absent si signalé par le propriétaire
+  reportedAt: string;
+  estimatedCost?: number;
+  status: InterventionStatus;
+}
+
 /** Statut d'une unité pour une période donnée (couleurs de la grille des lots). */
 export type RentStatus = 'paye' | 'en_retard' | 'a_verifier' | 'a_payer' | 'libre';
 

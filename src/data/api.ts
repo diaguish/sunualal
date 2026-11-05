@@ -1,4 +1,4 @@
-import type { ID, Lease, Payment, Property, Receipt, Tenant, Unit, Expense } from '@/types/models';
+import type { ID, Intervention, Lease, Payment, Property, Receipt, Tenant, Unit, Expense } from '@/types/models';
 
 import * as db from './mock';
 
@@ -58,6 +58,23 @@ export const listPayments = (period?: string): Promise<Payment[]> =>
 
 export const listReceipts = (): Promise<Receipt[]> => delay(db.receipts);
 export const listExpenses = (): Promise<Expense[]> => delay(db.expenses);
+
+export async function createExpense(input: Omit<Expense, 'id'>): Promise<Expense> {
+  const expense: Expense = { ...input, id: newId('e') };
+  db.expenses.push(expense);
+  return delay(expense);
+}
+
+// ——— Travaux : interventions ———
+
+export const listInterventions = (): Promise<Intervention[]> => delay(db.interventions);
+
+/** Marque une intervention comme terminée. */
+export async function completeIntervention(id: ID): Promise<Intervention | undefined> {
+  const intervention = db.interventions.find((i) => i.id === id);
+  if (intervention) intervention.status = 'termine';
+  return delay(intervention);
+}
 
 /** Enregistre un paiement ; génère la quittance s'il est confirmé. */
 export async function recordPayment(input: Omit<Payment, 'id'>): Promise<{ payment: Payment; receipt?: Receipt }> {
