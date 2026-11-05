@@ -17,8 +17,8 @@ export function PropertyCard({ summary }: { summary: PropertySummary }) {
       accessibilityLabel={`Voir ${property.name}`}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       <View style={styles.facade}>
-        {groupByFloor(views).map(({ floor, units }) => (
-          <View key={floor} style={styles.floor}>
+        {groupByFloor(views).map(({ key, units }) => (
+          <View key={key} style={styles.floor}>
             {units.map(({ unit, status }) => (
               <View
                 key={unit.id}

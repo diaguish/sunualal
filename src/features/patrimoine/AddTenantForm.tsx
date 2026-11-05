@@ -1,23 +1,13 @@
 import { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  KeyboardTypeOptions,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui';
-import { colors, radius, spacing, typography } from '@/theme';
+import { colors, spacing, typography } from '@/theme';
 import type { Lease, Tenant } from '@/types/models';
 
 import { FilterChip } from './FilterChip';
+import { FormField as Field } from './FormField';
 import { defaultEndDate, isoToInput, parseTenantForm, TenantFormErrors, TenantFormValues } from './tenant-form';
 import type { UnitView } from './units';
 
@@ -176,33 +166,6 @@ function FormContent({ today, freeUnits, onClose, onSubmit }: Omit<AddTenantForm
   );
 }
 
-interface FieldProps {
-  label: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder: string;
-  keyboardType?: KeyboardTypeOptions;
-  autoCapitalize?: 'none' | 'words';
-  error?: string;
-}
-
-function Field({ label, error, autoCapitalize = 'none', ...input }: FieldProps) {
-  return (
-    <View style={styles.field}>
-      <Text style={[typography.caption, styles.label]}>{label}</Text>
-      <TextInput
-        {...input}
-        accessibilityLabel={label}
-        autoCapitalize={autoCapitalize}
-        autoCorrect={false}
-        placeholderTextColor={colors.textMuted}
-        style={[typography.body, styles.input, !!error && styles.inputError]}
-      />
-      {error && <Text style={[typography.caption, styles.error]}>{error}</Text>}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   header: {
@@ -218,16 +181,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing.md },
   field: { flex: 1, gap: spacing.xs },
   label: { color: colors.text, fontWeight: '600' },
-  input: {
-    color: colors.text,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  inputError: { borderColor: colors.late },
   units: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   error: { color: colors.late },
 });
