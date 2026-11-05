@@ -1,4 +1,4 @@
-import { daysLate, remainingAmount, rentStatus } from '@/domain/rent';
+import { daysLate, dueDate, remainingAmount, rentStatus } from '@/domain/rent';
 import type { Lease, Payment, RentStatus, Tenant, Unit } from '@/types/models';
 
 /** Une unité avec tout ce qu'il faut pour l'afficher dans la grille et sa fiche. */
@@ -25,7 +25,9 @@ export function buildUnitViews(
   return units.map((unit) => {
     const lease = leases.find((l) => l.unitId === unit.id);
     if (!lease) return { unit, status: 'libre', remaining: 0, late: 0 };
-    const status = rentStatus(lease, period, payments, today);
+    const computed = rentStatus(lease, period, payments, today);
+    // Bail signé après l'échéance du mois : ce locataire n'est pas en retard, son premier loyer reste à venir.
+    const status = computed === 'en_retard' && lease.startDate > dueDate(lease, period) ? 'a_payer' : computed;
     return {
       unit,
       status,
