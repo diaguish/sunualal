@@ -1,4 +1,4 @@
-import type { Expense, Lease, Payment, Property, Receipt, Tenant, Unit } from '@/types/models';
+import type { Expense, Intervention, Lease, Payment, Property, Receipt, Tenant, Unit } from '@/types/models';
 
 /**
  * Données fictives reprises de la maquette Figma.
@@ -121,4 +121,10 @@ leases.forEach((lease) => {
 export const expenses: Expense[] = [
   { id: 'e-1', propertyId: 'p-teranga', unitId: 'u-c2', label: 'Peinture C2', category: 'travaux', amount: 180_000, date: '2026-10-02' },
   { id: 'e-2', propertyId: 'p-baobab', label: 'Vidange fosse septique', category: 'entretien', amount: 45_000, date: '2026-09-21' },
+];
+
+export const interventions: Intervention[] = [
+  { id: 'i-1', propertyId: 'p-teranga', unitId: 'u-b1', label: "Fuite sous l'évier de la cuisine", reportedByTenantId: 't-awa', reportedAt: '2026-10-07', estimatedCost: 25_000, status: 'en_cours' },
+  { id: 'i-2', propertyId: 'p-baobab', unitId: 'u-1a', label: 'Prise électrique hors service', reportedByTenantId: 't-ousmane', reportedAt: '2026-10-10', estimatedCost: 15_000, status: 'en_cours' },
+  { id: 'i-3', propertyId: 'p-villa', label: 'Portail à repeindre', reportedAt: '2026-10-12', estimatedCost: 60_000, status: 'en_cours' },
 ];
