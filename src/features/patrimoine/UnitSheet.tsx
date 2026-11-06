@@ -3,11 +3,11 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, RENT_STATUS_COLORS } from '@/components/ui';
-import { dueDate } from '@/domain/rent';
 import { colors, radius, spacing, typography } from '@/theme';
 import type { Property } from '@/types/models';
-import { formatAmount, formatDate, formatFCFA } from '@/utils/format';
+import { formatAmount } from '@/utils/format';
 
+import { RentSituation } from './RentSituation';
 import type { UnitView } from './units';
 
 interface UnitSheetProps {
@@ -61,11 +61,7 @@ function UnitSheetContent({ property, period, view, onClose }: UnitSheetProps & 
         </View>
       </View>
 
-      <View style={[styles.banner, BANNER_STYLES[status]]}>
-        <Text style={[typography.bodyStrong, { color: BANNER_STYLES[status].color }]}>
-          {situation(view, period, rent)}
-        </Text>
-      </View>
+      <RentSituation view={view} period={period} />
 
       {free ? (
         // L'écran « Louer un lot » n'existe pas encore : la gestion des baux passe par Locataires.
@@ -86,30 +82,6 @@ function UnitSheetContent({ property, period, view, onClose }: UnitSheetProps & 
     </>
   );
 }
-
-/** Phrase de la bannière : « Doit 250 000 FCFA · en retard de 9 jours ». */
-function situation({ status, remaining, late, lease }: UnitView, period: string, rent: number): string {
-  switch (status) {
-    case 'libre':
-      return `Lot libre · ${formatAmount(rent)} / mois`;
-    case 'paye':
-      return 'Loyer du mois payé';
-    case 'a_verifier':
-      return `Paiement déclaré · à vérifier`;
-    case 'en_retard':
-      return `Doit ${formatFCFA(remaining)} · en retard de ${late} jour${late > 1 ? 's' : ''}`;
-    case 'a_payer':
-      return `Doit ${formatFCFA(remaining)} · échéance le ${lease ? formatDate(dueDate(lease, period)) : '—'}`;
-  }
-}
-
-const BANNER_STYLES = {
-  paye: { backgroundColor: colors.primarySoft, color: colors.paid },
-  en_retard: { backgroundColor: colors.lateSoft, color: colors.late },
-  a_verifier: { backgroundColor: colors.toVerifySoft, color: colors.toVerify },
-  a_payer: { backgroundColor: colors.background, color: colors.text },
-  libre: { backgroundColor: colors.background, color: colors.text },
-};
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
@@ -134,7 +106,6 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 22 },
   onColor: { color: colors.textOnPrimary },
   muted: { color: colors.textMuted },
-  banner: { borderRadius: radius.md, padding: spacing.md },
   actions: { flexDirection: 'row', gap: spacing.md },
   action: { flex: 1, alignSelf: 'auto' },
 });

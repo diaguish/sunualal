@@ -21,8 +21,8 @@ export function UnitGrid({ units, onSelect }: UnitGridProps) {
     <View style={styles.root}>
       <View style={styles.building}>
         <View style={styles.roof} />
-        {floors.map(({ floor, units: row }) => (
-          <View key={floor} style={styles.floor}>
+        {floors.map(({ key, floor, units: row }) => (
+          <View key={key} style={styles.floor}>
             {floor !== '' && <Text style={[typography.caption, styles.floorLabel]}>{floor}</Text>}
             {row.map((view) => (
               <UnitTile key={view.unit.id} view={view} onPress={() => onSelect(view)} />
