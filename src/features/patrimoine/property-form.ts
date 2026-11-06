@@ -1,5 +1,7 @@
 import type { Property, PropertyType } from '@/types/models';
 
+import { parseAmountInput } from './tenant-form';
+
 const MAX_UNITS = 50;
 
 /** Ce qui change d'un type de bien à l'autre dans le formulaire. */
@@ -81,7 +83,7 @@ export function parsePropertyForm(
   const count = countLabel ? Number(values.count) : 1;
   if (!Number.isInteger(count) || count < 1 || count > MAX_UNITS) errors.count = `Entre 1 et ${MAX_UNITS}.`;
 
-  const rent = Number(values.rent.replace(/\s/g, ''));
+  const rent = parseAmountInput(values.rent);
   if (!Number.isInteger(rent) || rent <= 0) errors.rent = 'Indiquez le loyer en FCFA, sans centimes.';
 
   if (Object.keys(errors).length > 0) return { errors };

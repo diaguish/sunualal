@@ -29,6 +29,15 @@ export function inputToIso(text: string): string | undefined {
   return exists ? date.toISOString().slice(0, 10) : undefined;
 }
 
+/**
+ * Montant saisi → entier en FCFA, en ne gardant que les chiffres.
+ * « 150 000 », « 150.000 » et « 150,000 » donnent tous 150000 (et non 150) ; 0 si aucun chiffre.
+ */
+export function parseAmountInput(text: string): number {
+  const digits = text.replace(/\D/g, '');
+  return digits ? Number(digits) : 0;
+}
+
 /** Bail de deux ans par défaut : début le 14/10/2026 → fin le 13/10/2028. */
 export function defaultEndDate(startIso: string): string {
   const [y, m, d] = startIso.split('-').map(Number);
@@ -58,7 +67,7 @@ export function parseTenantForm(
 
   if (!values.unitId) errors.unitId = 'Choisissez le lot loué.';
 
-  const rent = Number(values.rent.replace(/\s/g, ''));
+  const rent = parseAmountInput(values.rent);
   if (!Number.isInteger(rent) || rent <= 0) errors.rent = 'Indiquez le loyer en FCFA, sans centimes.';
 
   const dueDay = Number(values.dueDay);

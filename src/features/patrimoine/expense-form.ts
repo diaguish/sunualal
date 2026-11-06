@@ -1,6 +1,6 @@
 import type { Expense, ExpenseCategory } from '@/types/models';
 
-import { inputToIso } from './tenant-form';
+import { inputToIso, parseAmountInput } from './tenant-form';
 
 export const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   travaux: 'Travaux',
@@ -32,7 +32,7 @@ export function parseExpenseForm(values: ExpenseFormValues): { errors: ExpenseFo
   if (!values.category) errors.category = 'Choisissez une catégorie.';
   if (!values.propertyId) errors.propertyId = 'Choisissez le bien concerné.';
 
-  const amount = Number(values.amount.replace(/\s/g, ''));
+  const amount = parseAmountInput(values.amount);
   if (!Number.isInteger(amount) || amount <= 0) errors.amount = 'Indiquez le montant en FCFA, sans centimes.';
 
   const date = inputToIso(values.date);
