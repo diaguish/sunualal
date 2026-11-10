@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { ScrollView, ScrollViewInstance, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppHeader, Button, Card, Screen } from '@/components/ui';
 import * as api from '@/data/api';
 import { AddTenantForm } from '@/features/patrimoine/AddTenantForm';
 import { FilterChip } from '@/features/patrimoine/FilterChip';
-import { TenantCard } from '@/features/patrimoine/TenantCard';
 import { TenantRow } from '@/features/patrimoine/TenantRow';
+import { TenantSheet } from '@/features/patrimoine/TenantSheet';
 import { buildTenantEntries, matchesSearch, TenantEntry } from '@/features/patrimoine/tenants';
 import { buildUnitViews } from '@/features/patrimoine/units';
 import { useReloadOnFocus } from '@/features/patrimoine/use-reload-on-focus';
@@ -21,7 +21,7 @@ const FILTERS: { key: Filter; label: string; matches: (entry: TenantEntry) => bo
   { key: 'fin_de_bail', label: 'Fin de bail proche', matches: (entry) => entry.endingSoon },
 ];
 
-/** Locataires — recherche, filtres et fiche du locataire sélectionné. Maquette : « Locataires ». */
+/** Locataires — recherche, filtres ; toucher un locataire ouvre sa fiche dans une fenêtre qui monte. Maquette : « Locataires ». */
 export default function LocatairesScreen() {
   const { data, reload } = useData(async () => {
     const [today, period, properties, units, leases, tenants, payments] = await Promise.all([
@@ -43,23 +43,16 @@ export default function LocatairesScreen() {
 
   const [filter, setFilter] = useState<Filter>('tous');
   const [query, setQuery] = useState('');
-  const [selectedId, setSelectedId] = useState<string>();
+  // Bail dont la fiche est ouverte (fenêtre qui monte) ; aucune fiche ouverte d'office.
+  const [openId, setOpenId] = useState<string>();
   const [adding, setAdding] = useState(false);
 
-  const scrollRef = useRef<ScrollViewInstance>(null);
-  const cardY = useRef(0);
-  const justAddedId = useRef<string>(undefined);
+  // Locataire qui vient d'être ajouté : sa fiche s'ouvre dès qu'il apparaît dans la liste rechargée.
+  const [justAddedId, setJustAddedId] = useState<string>();
 
   const activeFilter = FILTERS.find((f) => f.key === filter) ?? FILTERS[0];
   const visible = data?.entries.filter((e) => activeFilter.matches(e) && matchesSearch(e, query.trim()));
-  // Le premier locataire de la liste est sélectionné d'office, comme sur la maquette.
-  const selected = visible?.find((e) => e.lease.id === selectedId) ?? visible?.[0];
-
-  const select = (entry: TenantEntry) => {
-    setSelectedId(entry.lease.id);
-    // La fiche est sous la liste : on l'amène à l'écran, sinon rien ne semble se passer.
-    scrollRef.current?.scrollTo({ y: cardY.current, animated: true });
-  };
+  const opened = data?.entries.find((e) => e.lease.id === openId);
 
   const addTenant = async (
     tenantInput: Parameters<typeof api.createTenant>[0],
@@ -67,77 +60,72 @@ export default function LocatairesScreen() {
   ) => {
     const tenant = await api.createTenant(tenantInput);
     const lease = await api.createLease({ ...leaseInput, tenantId: tenant.id });
-    // Filtres retirés pour être sûr de voir le nouveau locataire, dont la fiche s'affiche une fois la liste rechargée.
+    // Filtres retirés pour être sûr de voir le nouveau locataire, dont la fiche s'ouvre une fois la liste rechargée.
     setFilter('tous');
     setQuery('');
-    setSelectedId(lease.id);
-    justAddedId.current = lease.id;
+    setJustAddedId(lease.id);
     setAdding(false);
     reload();
   };
 
-  const selectedLeaseId = selected?.lease.id;
+  const addedLoaded = !!justAddedId && !!data?.entries.some((e) => e.lease.id === justAddedId);
   useEffect(() => {
-    if (!selectedLeaseId || selectedLeaseId !== justAddedId.current) return;
-    justAddedId.current = undefined;
-    // On laisse d'abord le formulaire finir de se fermer et la fiche prendre sa place sous la liste.
-    const timer = setTimeout(() => scrollRef.current?.scrollTo({ y: cardY.current, animated: true }), 350);
+    if (!addedLoaded || !justAddedId) return;
+    // Sur iPhone, une fenêtre ne peut pas s'ouvrir pendant que le formulaire se ferme : on attend la fin de l'animation.
+    const timer = setTimeout(() => {
+      setOpenId(justAddedId);
+      setJustAddedId(undefined);
+    }, 600);
     return () => clearTimeout(timer);
-  }, [selectedLeaseId]);
+  }, [addedLoaded, justAddedId]);
 
   return (
-    <Screen scroll={false} contentStyle={styles.screen}>
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <AppHeader notificationCount={6} />
+    <Screen>
+      <AppHeader notificationCount={6} />
 
-        <View>
-          <Text style={[typography.title, styles.text]}>Locataires</Text>
-          <Text style={[typography.caption, styles.muted]}>Contacts, baux et situation de chacun</Text>
-        </View>
+      <View>
+        <Text style={[typography.title, styles.text]}>Locataires</Text>
+        <Text style={[typography.caption, styles.muted]}>Contacts, baux et situation de chacun</Text>
+      </View>
 
-        <Button label="Ajouter un locataire" icon="add" onPress={() => setAdding(true)} />
+      <Button label="Ajouter un locataire" icon="add" onPress={() => setAdding(true)} />
 
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Rechercher un locataire, un lot…"
-          placeholderTextColor={colors.textMuted}
-          autoCorrect={false}
-          returnKeyType="search"
-          style={[typography.body, styles.search]}
-        />
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Rechercher un locataire, un lot…"
+        placeholderTextColor={colors.textMuted}
+        autoCorrect={false}
+        returnKeyType="search"
+        style={[typography.body, styles.search]}
+      />
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {FILTERS.map((f) => (
-            <FilterChip
-              key={f.key}
-              label={`${f.label} ${data?.entries.filter(f.matches).length ?? ''}`.trim()}
-              active={f.key === filter}
-              onPress={() => setFilter(f.key)}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        {FILTERS.map((f) => (
+          <FilterChip
+            key={f.key}
+            label={`${f.label} ${data?.entries.filter(f.matches).length ?? ''}`.trim()}
+            active={f.key === filter}
+            onPress={() => setFilter(f.key)}
+          />
+        ))}
+      </ScrollView>
+
+      {visible && (
+        <Card>
+          {visible.map((entry) => (
+            <TenantRow
+              key={entry.lease.id}
+              entry={entry}
+              selected={entry.lease.id === openId}
+              onPress={() => setOpenId(entry.lease.id)}
             />
           ))}
-        </ScrollView>
+          {visible.length === 0 && <Text style={[typography.body, styles.muted]}>Aucun locataire trouvé.</Text>}
+        </Card>
+      )}
 
-        {visible && (
-          <Card>
-            {visible.map((entry) => (
-              <TenantRow
-                key={entry.lease.id}
-                entry={entry}
-                selected={entry.lease.id === selected?.lease.id}
-                onPress={() => select(entry)}
-              />
-            ))}
-            {visible.length === 0 && <Text style={[typography.body, styles.muted]}>Aucun locataire trouvé.</Text>}
-          </Card>
-        )}
-
-        {data && selected && (
-          <View onLayout={(e) => (cardY.current = e.nativeEvent.layout.y)}>
-            <TenantCard entry={selected} period={data.period} />
-          </View>
-        )}
-      </ScrollView>
+      {data && <TenantSheet entry={opened} period={data.period} onClose={() => setOpenId(undefined)} />}
 
       {data && (
         <AddTenantForm
@@ -153,8 +141,6 @@ export default function LocatairesScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { padding: 0 },
-  content: { padding: spacing.lg, gap: spacing.md },
   text: { color: colors.text },
   muted: { color: colors.textMuted },
   search: {

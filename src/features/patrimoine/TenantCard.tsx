@@ -12,8 +12,15 @@ import type { TenantEntry } from './tenants';
 /** « 2025-02-01 » → « févr. 2025 ». */
 const monthAndYear = (iso: string) => formatDate(iso, true).split(' ').slice(1).join(' ');
 
-/** Fiche du locataire sélectionné, sous la liste : contact, bail et loyer du mois. */
-export function TenantCard({ entry, period }: { entry: TenantEntry; period: string }) {
+interface TenantCardProps {
+  entry: TenantEntry;
+  period: string;
+  /** « Saisir un paiement » : par défaut ouvre l'écran directement ; la fiche en fenêtre se ferme d'abord. */
+  onCollect?: () => void;
+}
+
+/** Fiche du locataire : contact, bail et loyer du mois. Affichée dans `TenantSheet`. */
+export function TenantCard({ entry, period, onCollect }: TenantCardProps) {
   const { tenant, lease, view, propertyName } = entry;
   const phoneDigits = tenant.phone.replace(/\D/g, '');
 
@@ -48,7 +55,7 @@ export function TenantCard({ entry, period }: { entry: TenantEntry; period: stri
           label="Saisir un paiement"
           variant="secondary"
           style={styles.outlined}
-          onPress={() => router.push({ pathname: '/paiement/nouveau', params: { leaseId: lease.id } })}
+          onPress={onCollect ?? (() => router.push({ pathname: '/paiement/nouveau', params: { leaseId: lease.id } }))}
         />
       </View>
 
