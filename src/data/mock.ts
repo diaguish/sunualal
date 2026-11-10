@@ -90,13 +90,17 @@ export const receipts: Receipt[] = payments
     issuedAt: p.paidAt,
   }));
 
-/** Mois précédents : payés à temps sauf les exceptions ci-dessous (points de régularité de la fiche locataire). */
+/**
+ * Mois précédents : payés à temps sauf les exceptions ci-dessous (points de régularité de la fiche locataire).
+ * Un paiement règle toujours le mois le plus ancien (`allocateOldestFirst`) : un « impaye » ne peut donc être
+ * suivi que d'autres impayés, jamais d'un mois payé.
+ */
 const HISTORY_PERIODS = ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09'];
 const HISTORY_EXCEPTIONS: Record<string, Record<string, 'en_retard' | 'impaye'>> = {
   'l-b1': { '2026-08': 'en_retard', '2026-09': 'impaye' },
   'l-b2': { '2026-07': 'en_retard' },
   'l-rdc2': { '2026-05': 'en_retard' },
-  'l-1a': { '2026-06': 'impaye', '2026-09': 'en_retard' },
+  'l-1a': { '2026-06': 'en_retard', '2026-09': 'en_retard' },
   'l-2a': { '2026-08': 'en_retard' },
 };
 
