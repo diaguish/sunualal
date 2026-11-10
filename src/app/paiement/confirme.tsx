@@ -1,12 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Alert, Linking, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card } from '@/components/ui';
+import { APP_NAME } from '@/constants/app';
 import * as api from '@/data/api';
 import { PAYMENT_METHOD_LABELS } from '@/domain/rent';
 import { buildLeaseOptions, receiptMessage, unitLabel, whatsappUrl } from '@/features/argent/payment';
+import { buildReceiptViews } from '@/features/argent/receipts';
+import { shareReceiptPdf } from '@/features/argent/share-receipt';
 import { useData } from '@/hooks/use-data';
 import { colors, spacing, typography } from '@/theme';
 import { formatFCFA, formatPeriod } from '@/utils/format';
@@ -30,10 +34,17 @@ export default function PaiementEnregistreScreen() {
     const option = buildLeaseOptions(leases, tenants, units, properties, payments, payment.period, today).find(
       (o) => o.lease.id === payment.leaseId,
     );
-    return { payment, option, receipt: receipts.find((r) => r.paymentId === payment.id) };
+    const receipt = receipts.find((r) => r.paymentId === payment.id);
+    // Même vue que l'écran Quittances, pour générer le PDF.
+    const receiptView = receipt
+      ? buildReceiptViews([receipt], payments, leases, tenants, units, properties)[0]
+      : undefined;
+    return { payment, option, receipt, receiptView };
   }, [paymentId]);
+  const [sharing, setSharing] = useState(false);
 
-  const finish = () => router.dismissAll();
+  // Ouvert par un lien direct, il n'y a rien dessous à révéler : on revient à l'Accueil.
+  const finish = () => (router.canDismiss() ? router.dismissAll() : router.replace('/'));
 
   if (!data) {
     return (
@@ -45,7 +56,7 @@ export default function PaiementEnregistreScreen() {
     );
   }
 
-  const { payment, option, receipt } = data;
+  const { payment, option, receipt, receiptView } = data;
   const tenantName = option?.tenant?.fullName ?? 'le locataire';
   const remaining = option?.remaining ?? 0;
   const message = receiptMessage({
@@ -64,6 +75,18 @@ export default function PaiementEnregistreScreen() {
       await Linking.openURL(whatsappUrl(phone, message));
     } catch {
       Alert.alert('WhatsApp indisponible', 'Impossible d’ouvrir WhatsApp sur cet appareil.');
+    }
+  };
+
+  const sharePdf = async () => {
+    if (!receiptView) return;
+    setSharing(true);
+    try {
+      await shareReceiptPdf(receiptView, APP_NAME);
+    } catch {
+      Alert.alert('PDF indisponible', 'La quittance n’a pas pu être générée. Réessayez.');
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -86,21 +109,34 @@ export default function PaiementEnregistreScreen() {
           </Text>
 
           <View style={styles.actions}>
+            {receiptView && (
+              <Button
+                label={sharing ? 'Préparation du PDF…' : 'Partager le PDF'}
+                icon="document-outline"
+                fullWidth
+                disabled={sharing}
+                onPress={sharePdf}
+              />
+            )}
             <Button
-              label="Envoyer par WhatsApp"
+              label="Message WhatsApp"
               icon="logo-whatsapp"
+              variant={receiptView ? 'secondary' : 'primary'}
               fullWidth
+              style={receiptView ? styles.outlined : undefined}
               disabled={!phone}
               onPress={sendWhatsApp}
             />
-            <Button
-              label="Partager la quittance"
-              icon="share-outline"
-              variant="secondary"
-              fullWidth
-              style={styles.outlined}
-              onPress={() => Share.share({ message })}
-            />
+            {receipt && (
+              <Button
+                label="Voir la quittance"
+                icon="document-text-outline"
+                variant="secondary"
+                fullWidth
+                style={styles.outlined}
+                onPress={() => router.push({ pathname: '/paiement/quittance/[id]', params: { id: receipt.id } })}
+              />
+            )}
             <Button label="Terminer" variant="secondary" fullWidth style={styles.outlined} onPress={finish} />
           </View>
         </Card>
