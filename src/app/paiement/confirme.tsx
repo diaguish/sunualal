@@ -9,7 +9,7 @@ import { PAYMENT_METHOD_LABELS } from '@/domain/rent';
 import { buildLeaseOptions, receiptMessage, unitLabel, whatsappUrl } from '@/features/argent/payment';
 import { useData } from '@/hooks/use-data';
 import { colors, spacing, typography } from '@/theme';
-import { formatFCFA } from '@/utils/format';
+import { formatFCFA, formatPeriod } from '@/utils/format';
 
 /** Paiement enregistré — récapitulatif et envoi de la quittance. Maquette : « Paiement enregistré ». */
 export default function PaiementEnregistreScreen() {
@@ -80,7 +80,9 @@ export default function PaiementEnregistreScreen() {
             {receipt ? ` La quittance ${receipt.number} est prête.` : ''}
           </Text>
           <Text style={[typography.bodyStrong, styles.center, { color: remaining > 0 ? colors.late : colors.paid }]}>
-            {remaining > 0 ? `Reste dû : ${formatFCFA(remaining)}` : 'Loyer du mois soldé'}
+            {remaining > 0
+              ? `Reste dû : ${formatFCFA(remaining)}`
+              : `Loyer ${/^[aeiou]/i.test(formatPeriod(payment.period)) ? 'd’' : 'de '}${formatPeriod(payment.period)} soldé`}
           </Text>
 
           <View style={styles.actions}>
