@@ -33,7 +33,8 @@ export default function PaiementEnregistreScreen() {
     return { payment, option, receipt: receipts.find((r) => r.paymentId === payment.id) };
   }, [paymentId]);
 
-  const finish = () => router.dismissAll();
+  // Ouvert par un lien direct, il n'y a rien dessous à révéler : on revient à l'Accueil.
+  const finish = () => (router.canDismiss() ? router.dismissAll() : router.replace('/'));
 
   if (!data) {
     return (
@@ -99,6 +100,16 @@ export default function PaiementEnregistreScreen() {
               style={styles.outlined}
               onPress={() => Share.share({ message })}
             />
+            {receipt && (
+              <Button
+                label="Voir la quittance"
+                icon="document-text-outline"
+                variant="secondary"
+                fullWidth
+                style={styles.outlined}
+                onPress={() => router.push({ pathname: '/paiement/quittance/[id]', params: { id: receipt.id } })}
+              />
+            )}
             <Button label="Terminer" variant="secondary" fullWidth style={styles.outlined} onPress={finish} />
           </View>
         </Card>
