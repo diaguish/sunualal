@@ -13,7 +13,7 @@ import { TextField } from '@/features/argent/TextField';
 import { useData } from '@/hooks/use-data';
 import { colors, radius, spacing, typography } from '@/theme';
 import type { PaymentMethod } from '@/types/models';
-import { formatAmount, formatFCFA } from '@/utils/format';
+import { formatAmount, formatFCFA, formatPeriod } from '@/utils/format';
 
 const METHODS = (Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((key) => ({
   key,
@@ -23,13 +23,14 @@ const METHODS = (Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((key
 /**
  * Saisir un paiement — le propriétaire enregistre un loyer reçu.
  * Ouvert depuis Accueil (« Encaisser »), Argent, ou la fiche d'un lot avec `leaseId` pré-rempli.
+ * `period` (« 2026-09 ») permet de régler un reliquat d'un mois précédent, depuis l'écran Reliquats.
  * Maquette : « Saisir un paiement ».
  */
 export default function SaisirPaiementScreen() {
-  const params = useLocalSearchParams<{ leaseId?: string }>();
+  const params = useLocalSearchParams<{ leaseId?: string; period?: string }>();
 
   const { data } = useData(async () => {
-    const [today, period, leases, tenants, units, properties, payments] = await Promise.all([
+    const [today, currentPeriod, leases, tenants, units, properties, payments] = await Promise.all([
       api.getToday(),
       api.getCurrentPeriod(),
       api.listLeases(),
@@ -38,8 +39,17 @@ export default function SaisirPaiementScreen() {
       api.listProperties(),
       api.listPayments(),
     ]);
-    return { today, period, options: buildLeaseOptions(leases, tenants, units, properties, payments, period, today) };
-  }, []);
+    // Un mois passé est accepté ; une valeur invalide ou future retombe sur le mois en cours.
+    const requested = params.period;
+    const period =
+      requested && /^\d{4}-\d{2}$/.test(requested) && requested <= currentPeriod ? requested : currentPeriod;
+    return {
+      today,
+      period,
+      isPastMonth: period !== currentPeriod,
+      options: buildLeaseOptions(leases, tenants, units, properties, payments, period, today),
+    };
+  }, [params.period]);
 
   const [leaseId, setLeaseId] = useState(params.leaseId);
   // `undefined` = montant par défaut (le reste dû) tant que l'utilisateur n'a rien saisi.
@@ -104,6 +114,15 @@ export default function SaisirPaiementScreen() {
               <Text style={[typography.caption, styles.change]}>Changer</Text>
             </Pressable>
           </View>
+
+          {data.isPastMonth && (
+            <Card style={styles.pastMonth}>
+              <Text style={[typography.bodyStrong, { color: colors.late }]}>
+                Reliquat du loyer {/^[aeiou]/i.test(formatPeriod(data.period)) ? 'd’' : 'de '}
+                {formatPeriod(data.period)}
+              </Text>
+            </Card>
+          )}
 
           <View style={styles.summary}>
             <SummaryBox label="Loyer" value={option.lease.rent} />
@@ -209,6 +228,7 @@ const styles = StyleSheet.create({
   box: { flex: 1, backgroundColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: 2 },
   boxDanger: { backgroundColor: colors.lateSoft },
   notice: { backgroundColor: colors.toVerifySoft },
+  pastMonth: { backgroundColor: colors.lateSoft },
   settle: {
     alignSelf: 'flex-start',
     backgroundColor: colors.border,
