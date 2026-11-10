@@ -81,3 +81,58 @@ export function previousPeriods(period: string, count: number): string[] {
     new Date(Date.UTC(year, month - 1 - count + i, 1)).toISOString().slice(0, 7),
   );
 }
+
+// ——— Imputation des paiements ———
+//
+// Règle : un argent reçu règle toujours le mois dû le plus ancien d'abord.
+// Un mois ne peut donc pas être payé tant qu'un mois plus ancien reste impayé :
+// les impayés s'accumulent à la suite, sur les derniers mois.
+
+/**
+ * Mois suivis par l'app, du plus ancien au plus récent, jusqu'à `period` inclus.
+ * On part du premier mois où un paiement a été enregistré : avant, on ne sait pas ce qui a été payé.
+ */
+export function trackedPeriods(payments: Payment[], period: string): string[] {
+  const first = payments.reduce((min, p) => (p.period < min ? p.period : min), period);
+  const [fy, fm] = first.split('-').map(Number);
+  const [y, m] = period.split('-').map(Number);
+  return [...previousPeriods(period, (y - fy) * 12 + (m - fm)), period];
+}
+
+/** Un mois de loyer pas encore entièrement réglé. */
+export interface OutstandingMonth {
+  period: string;
+  remaining: number;
+}
+
+/**
+ * Ce qui reste dû sur un bail, mois par mois, du plus ancien au plus récent.
+ * Le mois en cours est inclus même avant son échéance (on peut payer d'avance).
+ * Les mois hors du bail sont ignorés.
+ */
+export function outstandingMonths(lease: Lease, payments: Payment[], periods: string[]): OutstandingMonth[] {
+  return periods.flatMap((period) => {
+    const due = dueDate(lease, period);
+    if (lease.startDate > due || lease.endDate < due) return [];
+    const remaining = remainingAmount(lease, period, payments);
+    return remaining > 0 ? [{ period, remaining }] : [];
+  });
+}
+
+/**
+ * Répartit un montant reçu sur les mois dus, le plus ancien d'abord.
+ * Ce qui dépasse le total dû est renvoyé dans `excess` (à l'appelant de le refuser).
+ */
+export function allocateOldestFirst(
+  months: OutstandingMonth[],
+  amount: number,
+): { allocations: { period: string; amount: number }[]; excess: number } {
+  let left = amount;
+  const allocations = months.flatMap(({ period, remaining }) => {
+    if (left <= 0) return [];
+    const part = Math.min(left, remaining);
+    left -= part;
+    return [{ period, amount: part }];
+  });
+  return { allocations, excess: left };
+}
