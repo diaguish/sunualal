@@ -1,5 +1,6 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { Alert, Linking, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card } from '@/components/ui';
@@ -8,6 +9,7 @@ import * as api from '@/data/api';
 import { PAYMENT_METHOD_LABELS } from '@/domain/rent';
 import { whatsappUrl } from '@/features/argent/payment';
 import { buildReceiptViews, ofPeriod, receiptPlace, receiptText } from '@/features/argent/receipts';
+import { shareReceiptPdf } from '@/features/argent/share-receipt';
 import { useData } from '@/hooks/use-data';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatDate, formatFCFA } from '@/utils/format';
@@ -15,6 +17,7 @@ import { formatDate, formatFCFA } from '@/utils/format';
 /** Une quittance, telle que le locataire la reçoit. Ouverte depuis Quittances ou « Paiement enregistré ». */
 export default function QuittanceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [sharing, setSharing] = useState(false);
 
   const { data: view, loading } = useData(async () => {
     const [receipts, payments, leases, tenants, units, properties] = await Promise.all([
@@ -55,13 +58,24 @@ export default function QuittanceScreen() {
     }
   };
 
+  const sharePdf = async () => {
+    setSharing(true);
+    try {
+      await shareReceiptPdf(view, APP_NAME);
+    } catch {
+      Alert.alert('PDF indisponible', 'La quittance n’a pas pu être générée. Réessayez.');
+    } finally {
+      setSharing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.root} edges={['bottom']}>
-      <Stack.Screen options={{ title: view.partial ? 'Reçu de paiement' : 'Quittance' }} />
+      <Stack.Screen options={{ title: view.partial ? 'Reçu d’acompte' : 'Quittance' }} />
       <ScrollView contentContainerStyle={styles.content}>
         <Card style={styles.document}>
           <Text style={[typography.overline, styles.muted]}>
-            {view.partial ? 'Reçu de paiement partiel' : 'Quittance de loyer'}
+            {view.partial ? 'Reçu d’acompte' : 'Quittance de loyer'}
           </Text>
           <Text style={[typography.title, styles.text]}>{receipt.number}</Text>
           <Text style={[typography.caption, styles.muted]}>Émise le {formatDate(receipt.issuedAt, true)}</Text>
@@ -92,18 +106,20 @@ export default function QuittanceScreen() {
 
         <View style={styles.actions}>
           <Button
-            label="Envoyer par WhatsApp"
-            icon="logo-whatsapp"
+            label={sharing ? 'Préparation du PDF…' : 'Partager le PDF'}
+            icon="document-outline"
             fullWidth
-            disabled={!tenant?.phone}
-            onPress={sendWhatsApp}
+            disabled={sharing}
+            onPress={sharePdf}
           />
           <Button
-            label="Partager"
-            icon="share-outline"
+            label="Message WhatsApp"
+            icon="logo-whatsapp"
             variant="secondary"
             fullWidth
-            onPress={() => Share.share({ title: receipt.number, message: text })}
+            style={styles.outlined}
+            disabled={!tenant?.phone}
+            onPress={sendWhatsApp}
           />
           <Button label="Fermer" variant="secondary" fullWidth onPress={close} />
         </View>
@@ -131,4 +147,5 @@ const styles = StyleSheet.create({
   text: { color: colors.text },
   muted: { color: colors.textMuted },
   actions: { gap: spacing.sm },
+  outlined: { borderWidth: 1, borderColor: colors.border },
 });

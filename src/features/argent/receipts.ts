@@ -84,7 +84,7 @@ export const ofPeriod = (period: string) => {
 /** Texte de la quittance, pour l'envoyer par WhatsApp ou l'enregistrer. */
 export function receiptText(view: ReceiptView): string {
   const { receipt, payment, tenant, property } = view;
-  const title = view.partial ? 'REÇU DE PAIEMENT PARTIEL' : 'QUITTANCE DE LOYER';
+  const title = view.partial ? 'REÇU D’ACOMPTE' : 'QUITTANCE DE LOYER';
   return [
     `${title} n° ${receipt.number}`,
     `Locataire : ${tenant?.fullName ?? '—'}`,
