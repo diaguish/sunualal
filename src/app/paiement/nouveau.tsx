@@ -5,15 +5,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card } from '@/components/ui';
 import * as api from '@/data/api';
-import { PAYMENT_METHOD_LABELS } from '@/domain/rent';
+import { allocateOldestFirst, PAYMENT_METHOD_LABELS } from '@/domain/rent';
 import { ChoiceChips } from '@/features/argent/ChoiceChips';
-import { buildLeaseOptions, leaseLabel, parseAmount } from '@/features/argent/payment';
+import { buildLeaseOptions, leaseLabel, monthLabel, parseAmount } from '@/features/argent/payment';
 import { TenantPicker } from '@/features/argent/TenantPicker';
 import { TextField } from '@/features/argent/TextField';
 import { useData } from '@/hooks/use-data';
 import { colors, radius, spacing, typography } from '@/theme';
 import type { PaymentMethod } from '@/types/models';
-import { formatAmount, formatFCFA, formatPeriod } from '@/utils/format';
+import { formatAmount, formatFCFA } from '@/utils/format';
 
 const METHODS = (Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((key) => ({
   key,
@@ -21,16 +21,16 @@ const METHODS = (Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((key
 }));
 
 /**
- * Saisir un paiement — le propriétaire enregistre un loyer reçu.
- * Ouvert depuis Accueil (« Encaisser »), Argent, ou la fiche d'un lot avec `leaseId` pré-rempli.
- * `period` (« 2026-09 ») permet de régler un reliquat d'un mois précédent, depuis l'écran Reliquats.
+ * Saisir un paiement — le propriétaire enregistre de l'argent reçu d'un locataire.
+ * Ouvert depuis Accueil (« Encaisser »), Argent, Reliquats ou la fiche d'un lot avec `leaseId` pré-rempli.
+ * Règle : l'argent règle les mois dus les plus anciens d'abord (`recordLeasePayment`) ; l'écran montre la répartition.
  * Maquette : « Saisir un paiement ».
  */
 export default function SaisirPaiementScreen() {
-  const params = useLocalSearchParams<{ leaseId?: string; period?: string }>();
+  const params = useLocalSearchParams<{ leaseId?: string }>();
 
   const { data } = useData(async () => {
-    const [today, currentPeriod, leases, tenants, units, properties, payments] = await Promise.all([
+    const [today, period, leases, tenants, units, properties, payments] = await Promise.all([
       api.getToday(),
       api.getCurrentPeriod(),
       api.listLeases(),
@@ -39,20 +39,11 @@ export default function SaisirPaiementScreen() {
       api.listProperties(),
       api.listPayments(),
     ]);
-    // Un mois passé est accepté ; une valeur invalide ou future retombe sur le mois en cours.
-    const requested = params.period;
-    const period =
-      requested && /^\d{4}-\d{2}$/.test(requested) && requested <= currentPeriod ? requested : currentPeriod;
-    return {
-      today,
-      period,
-      isPastMonth: period !== currentPeriod,
-      options: buildLeaseOptions(leases, tenants, units, properties, payments, period, today),
-    };
-  }, [params.period]);
+    return { today, options: buildLeaseOptions(leases, tenants, units, properties, payments, period, today) };
+  }, []);
 
   const [leaseId, setLeaseId] = useState(params.leaseId);
-  // `undefined` = montant par défaut (le reste dû) tant que l'utilisateur n'a rien saisi.
+  // `undefined` = montant par défaut (tout ce qui est dû) tant que l'utilisateur n'a rien saisi.
   const [amountText, setAmountText] = useState<string>();
   const [method, setMethod] = useState<PaymentMethod>('wave');
   const [reference, setReference] = useState('');
@@ -78,23 +69,23 @@ export default function SaisirPaiementScreen() {
     );
   }
 
-  const amount = amountText === undefined ? option.remaining : parseAmount(amountText);
-  const tooMuch = amount > option.remaining;
+  const amount = amountText === undefined ? option.totalDue : parseAmount(amountText);
+  const tooMuch = amount > option.totalDue;
   const canSubmit = amount > 0 && !tooMuch && !submitting;
+  // Aperçu de l'imputation : le même calcul que l'API fera à l'enregistrement.
+  const { allocations } = allocateOldestFirst(option.owed, tooMuch ? option.totalDue : amount);
 
   const submit = async () => {
     setSubmitting(true);
     try {
-      const { payment } = await api.recordPayment({
+      const { payments } = await api.recordLeasePayment({
         leaseId: option.lease.id,
-        period: data.period,
         amount,
         method,
         reference: reference.trim() || undefined,
-        status: 'confirme',
         paidAt: data.today,
       });
-      router.replace({ pathname: '/paiement/confirme', params: { paymentId: payment.id } });
+      router.replace({ pathname: '/paiement/confirme', params: { paymentIds: payments.map((p) => p.id).join(',') } });
     } catch {
       setSubmitting(false);
       Alert.alert('Paiement non enregistré', 'Une erreur est survenue. Réessayez.');
@@ -115,20 +106,23 @@ export default function SaisirPaiementScreen() {
             </Pressable>
           </View>
 
-          {data.isPastMonth && (
-            <Card style={styles.pastMonth}>
-              <Text style={[typography.bodyStrong, { color: colors.late }]}>
-                Reliquat du loyer {/^[aeiou]/i.test(formatPeriod(data.period)) ? 'd’' : 'de '}
-                {formatPeriod(data.period)}
-              </Text>
-            </Card>
-          )}
-
           <View style={styles.summary}>
             <SummaryBox label="Loyer" value={option.lease.rent} />
-            <SummaryBox label="Déjà payé" value={option.paid} />
-            <SummaryBox label="Reste dû" value={option.remaining} danger={option.remaining > 0} />
+            <SummaryBox label="Payé ce mois" value={option.paid} />
+            <SummaryBox label="Total dû" value={option.totalDue} danger={option.totalDue > 0} />
           </View>
+
+          {option.owed.length > 1 && (
+            <Card style={styles.owed}>
+              <Text style={[typography.caption, styles.label]}>Dû mois par mois</Text>
+              {option.owed.map((m) => (
+                <View key={m.period} style={styles.line}>
+                  <Text style={[typography.body, styles.text]}>{monthLabel(m.period)}</Text>
+                  <Text style={[typography.bodyStrong, { color: colors.late }]}>{formatFCFA(m.remaining)}</Text>
+                </View>
+              ))}
+            </Card>
+          )}
 
           {option.status === 'a_verifier' && (
             <Card style={styles.notice}>
@@ -138,25 +132,27 @@ export default function SaisirPaiementScreen() {
             </Card>
           )}
 
-          {option.remaining === 0 ? (
+          {option.totalDue === 0 ? (
             <Card>
-              <Text style={[typography.bodyStrong, { color: colors.paid }]}>Le loyer de ce mois est déjà soldé.</Text>
+              <Text style={[typography.bodyStrong, { color: colors.paid }]}>
+                Ce locataire est à jour : il ne doit rien pour le moment.
+              </Text>
             </Card>
           ) : (
             <>
               <TextField
                 label="Montant reçu (FCFA)"
-                value={amountText ?? String(option.remaining)}
+                value={amountText ?? String(option.totalDue)}
                 onChangeText={setAmountText}
                 keyboardType="number-pad"
-                error={tooMuch ? `Le montant dépasse le reste dû (${formatFCFA(option.remaining)}).` : undefined}
+                error={tooMuch ? `Le montant dépasse ce que le locataire doit (${formatFCFA(option.totalDue)}).` : undefined}
               />
-              {amount !== option.remaining && (
+              {amount !== option.totalDue && (
                 <Pressable
-                  onPress={() => setAmountText(String(option.remaining))}
+                  onPress={() => setAmountText(String(option.totalDue))}
                   style={styles.settle}
                   accessibilityRole="button">
-                  <Text style={[typography.caption, styles.label]}>Solder le reste</Text>
+                  <Text style={[typography.caption, styles.label]}>Tout régler</Text>
                 </Pressable>
               )}
 
@@ -176,10 +172,29 @@ export default function SaisirPaiementScreen() {
                 />
               )}
 
+              {allocations.length > 0 && (
+                <View style={styles.preview}>
+                  <Text style={[typography.caption, styles.label]}>Ce paiement règle, le plus ancien d’abord</Text>
+                  {allocations.map((a) => {
+                    const left = (option.owed.find((m) => m.period === a.period)?.remaining ?? 0) - a.amount;
+                    return (
+                      <View key={a.period} style={styles.line}>
+                        <Text style={[typography.body, styles.text]}>
+                          {monthLabel(a.period)} · {formatAmount(a.amount)}
+                        </Text>
+                        <Text style={[typography.caption, { color: left > 0 ? colors.late : colors.paid, fontWeight: '600' }]}>
+                          {left > 0 ? `reste ${formatAmount(left)}` : 'soldé'}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
               <View style={styles.reliquat}>
-                <Text style={[typography.caption, styles.label]}>Reliquat après ce paiement</Text>
+                <Text style={[typography.caption, styles.label]}>Reste dû après ce paiement</Text>
                 <Text style={[typography.heading, styles.text]}>
-                  {formatFCFA(Math.max(0, option.remaining - amount))}
+                  {formatFCFA(Math.max(0, option.totalDue - amount))}
                 </Text>
               </View>
 
@@ -227,8 +242,9 @@ const styles = StyleSheet.create({
   summary: { flexDirection: 'row', gap: spacing.sm },
   box: { flex: 1, backgroundColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: 2 },
   boxDanger: { backgroundColor: colors.lateSoft },
+  owed: { gap: spacing.xs },
+  line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   notice: { backgroundColor: colors.toVerifySoft },
-  pastMonth: { backgroundColor: colors.lateSoft },
   settle: {
     alignSelf: 'flex-start',
     backgroundColor: colors.border,
@@ -237,5 +253,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     marginTop: -spacing.sm,
   },
+  preview: { backgroundColor: colors.primarySoft, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs },
   reliquat: { backgroundColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: 2 },
 });

@@ -1,18 +1,19 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { Avatar } from '@/components/ui';
+import { Avatar, Button } from '@/components/ui';
 import { colors, radius, spacing, typography } from '@/theme';
-import { formatAmount, formatPeriod } from '@/utils/format';
+import { formatAmount } from '@/utils/format';
 
 import type { ArrearsLine } from './arrears';
+import { monthLabel } from './payment';
 
 interface ArrearsRowProps {
   line: ArrearsLine;
-  /** Ouvre « Saisir un paiement » pour un mois donné. */
-  onCollect: (period: string) => void;
+  /** Ouvre « Saisir un paiement » pour ce locataire : l'argent règle ses mois les plus anciens d'abord. */
+  onCollect: () => void;
 }
 
-/** Un locataire et ses reliquats, un bouton par mois à régler. */
+/** Un locataire, ses reliquats mois par mois, et un seul bouton pour encaisser. */
 export function ArrearsRow({ line, onCollect }: ArrearsRowProps) {
   const name = line.tenant?.fullName ?? '—';
   const place = [line.property?.name, line.unit?.label].filter(Boolean).join(' · ');
@@ -27,23 +28,17 @@ export function ArrearsRow({ line, onCollect }: ArrearsRowProps) {
         <Text style={[typography.bodyStrong, styles.total]}>{formatAmount(line.total)}</Text>
       </View>
       {line.months.map((m) => (
-        <Pressable
-          key={m.period}
-          onPress={() => onCollect(m.period)}
-          accessibilityRole="button"
-          accessibilityLabel={`Encaisser le reliquat de ${formatPeriod(m.period)}`}
-          style={({ pressed }) => [styles.month, pressed && styles.pressed]}>
+        <View key={m.period} style={styles.month}>
           <Text style={[typography.caption, styles.title]}>
-            {capitalize(formatPeriod(m.period))} · J+{m.days}
+            {monthLabel(m.period)} · J+{m.days}
           </Text>
-          <Text style={[typography.caption, styles.amount]}>{formatAmount(m.amount)} FCFA ›</Text>
-        </Pressable>
+          <Text style={[typography.caption, styles.amount]}>{formatAmount(m.amount)} FCFA</Text>
+        </View>
       ))}
+      <Button label="Encaisser" icon="add" variant="secondary" style={styles.collect} onPress={onCollect} />
     </View>
   );
 }
-
-const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 const styles = StyleSheet.create({
   root: { gap: spacing.sm, paddingVertical: spacing.sm },
@@ -60,6 +55,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  pressed: { opacity: 0.7 },
   amount: { color: colors.late, fontWeight: '600' },
+  collect: { borderWidth: 1, borderColor: colors.border },
 });

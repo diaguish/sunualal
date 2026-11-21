@@ -22,7 +22,7 @@ export function TenantPicker({ options, onSelect }: TenantPickerProps) {
           <View style={styles.text}>
             <Text style={[typography.bodyStrong, { color: colors.text }]}>{o.tenant?.fullName ?? '—'}</Text>
             <Text style={[typography.caption, styles.muted]}>
-              {unitLabel(o)} · {o.remaining > 0 ? `reste ${formatFCFA(o.remaining)}` : 'soldé'}
+              {unitLabel(o)} · {o.totalDue > 0 ? `doit ${formatFCFA(o.totalDue)}` : 'à jour'}
             </Text>
           </View>
           <StatusBadge status={o.status} />

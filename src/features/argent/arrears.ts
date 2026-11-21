@@ -1,4 +1,4 @@
-import { daysLate, dueDate, previousPeriods, remainingAmount } from '@/domain/rent';
+import { daysLate, dueDate, remainingAmount, trackedPeriods } from '@/domain/rent';
 import type { Lease, Payment, Property, Tenant, Unit } from '@/types/models';
 
 /** Un mois de loyer échu et pas entièrement payé. */
@@ -29,13 +29,6 @@ export interface ArrearsSummary {
   oldestDays: number;
 }
 
-/** Nombre de mois de `from` à `to` inclus : ("2026-05", "2026-10") → 6. */
-function monthSpan(from: string, to: string): number {
-  const [fy, fm] = from.split('-').map(Number);
-  const [ty, tm] = to.split('-').map(Number);
-  return (ty - fy) * 12 + (tm - fm) + 1;
-}
-
 /**
  * Tout ce qui reste dû, mois par mois, jusqu'au mois en cours.
  *
@@ -53,8 +46,7 @@ export function buildArrears(
   period: string,
   today: string,
 ): { lines: ArrearsLine[]; summary: ArrearsSummary } {
-  const firstTracked = payments.reduce((min, p) => (p.period < min ? p.period : min), period);
-  const periods = [...previousPeriods(period, monthSpan(firstTracked, period) - 1), period];
+  const periods = trackedPeriods(payments, period);
 
   const lines = leases
     .map((lease): ArrearsLine => {
