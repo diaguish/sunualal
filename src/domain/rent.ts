@@ -37,7 +37,8 @@ export function remainingAmount(lease: Lease, period: string, payments: Payment[
  * Règle métier centrale (voir maquette « Paiements ») :
  * - payé si le loyer est entièrement confirmé ;
  * - à vérifier si un paiement mobile money est déclaré mais pas confirmé ;
- * - en retard si la date d'échéance est passée ;
+ * - en retard si la date d'échéance est passée, sauf si le bail a commencé après cette échéance :
+ *   le locataire n'était pas encore là, son premier loyer reste à venir (« à payer ») ;
  * - à payer sinon.
  * Une unité sans bail est « libre » (géré par l'appelant).
  */
@@ -47,7 +48,8 @@ export function rentStatus(lease: Lease, period: string, payments: Payment[], to
     (p) => p.leaseId === lease.id && p.period === period && p.status === 'a_verifier',
   );
   if (pending) return 'a_verifier';
-  return today > dueDate(lease, period) ? 'en_retard' : 'a_payer';
+  const due = dueDate(lease, period);
+  return today > due && lease.startDate <= due ? 'en_retard' : 'a_payer';
 }
 
 /** Nombre de jours de retard (J+n) ; 0 si pas encore échu. */
