@@ -35,7 +35,7 @@ export function unitLabel(option: LeaseOption): string {
   return [option.property?.name, option.unit?.label].filter(Boolean).join(' · ');
 }
 
-const STATUS_ORDER: Record<RentStatus, number> = { en_retard: 0, a_payer: 1, a_verifier: 2, paye: 3, libre: 4 };
+export const STATUS_ORDER: Record<RentStatus, number> = { en_retard: 0, a_payer: 1, a_verifier: 2, paye: 3, libre: 4 };
 
 /** Baux de la période, ceux qui doivent de l'argent en premier (retards d'abord). */
 export function buildLeaseOptions(
@@ -66,6 +66,13 @@ export function buildLeaseOptions(
     })
     .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
 }
+
+/**
+ * Statut à afficher pour un locataire, tous mois confondus : le mois en cours peut être payé
+ * alors qu'un mois plus ancien (donc échu) reste dû — il est alors en retard.
+ */
+export const overallStatus = (option: LeaseOption): RentStatus =>
+  option.status === 'paye' && option.totalDue > 0 ? 'en_retard' : option.status;
 
 /** Saisie libre → montant entier : « 150 000 », « 150000 » ou « 150.000 » donnent 150000. */
 export function parseAmount(text: string): number {
