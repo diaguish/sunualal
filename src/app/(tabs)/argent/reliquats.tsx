@@ -65,9 +65,7 @@ export default function ReliquatsScreen() {
               <ArrearsRow
                 key={line.lease.id}
                 line={line}
-                onCollect={(period) =>
-                  router.push({ pathname: '/paiement/nouveau', params: { leaseId: line.lease.id, period } })
-                }
+                onCollect={() => router.push({ pathname: '/paiement/nouveau', params: { leaseId: line.lease.id } })}
               />
             ))}
             {data.lines.length === 0 && (
